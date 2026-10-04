@@ -18,13 +18,15 @@ namespace ISRORCert.Services
         private readonly IAsyncInterface _serverInterface;
         private readonly CertificationManager _certificationManager;
         private readonly IDbAdapter _adapter;
+        private readonly IHostApplicationLifetime _lifetime;
 
         public CertificationService(ILogger<CertificationService> logger,
                                     IOptions<CertificationConfig> options,
                                     IAsyncInterface serverInterface,
                                     AsyncServer server,
                                     CertificationManager certificationManager,
-                                    IDbAdapter adapter)
+                                    IDbAdapter adapter,
+                                    IHostApplicationLifetime lifetime)
         {
             _logger = logger;
             _options = options;
@@ -32,15 +34,35 @@ namespace ISRORCert.Services
             _server = server;
             _certificationManager = certificationManager;
             _adapter = adapter;
+            _lifetime = lifetime;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             _adapter.ConnectionString = _options.Value.DbConfig;
             if (!await _certificationManager.RefreshAsync(cancellationToken))
+            {
+                Fail("Certification data could not be loaded, shutting down.");
                 return;
+            }
 
-            CreateListener();
+            try
+            {
+                CreateListener();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, "Failed to start the listener");
+                Fail("Certification listener could not be started, shutting down.");
+            }
+        }
+
+        // Without data or a listener the process would sit idle forever, so stop it with a non-zero exit code.
+        private void Fail(string message)
+        {
+            _logger.LogCritical(message);
+            Environment.ExitCode = 1;
+            _lifetime.StopApplication();
         }
 
         private void CreateListener()

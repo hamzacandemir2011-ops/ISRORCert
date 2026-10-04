@@ -13,11 +13,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 6.0.x
+          dotnet-version: 10.0.x
       - name: Restore dependencies
         run: dotnet restore ./src/ISRORCert.sln
       - name: Build
@@ -31,9 +31,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WITH_V: true
       - name: publish_win_x64
-        run: dotnet publish ./src/ISRORCert.sln -r win-x64 -c Release --self-contained true -p:PublishReadyToRun=true && tar -czvf ISRORCert_win-x64.tar.gz -C ./src/ISRORCert/bin/Release/net6.0/win-x64/publish ./
+        run: dotnet publish ./src/ISRORCert/ISRORCert.csproj -r win-x64 -c Release --self-contained true -p:PublishReadyToRun=true && tar -czvf ISRORCert_win-x64.tar.gz -C ./src/ISRORCert/bin/Release/net10.0/win-x64/publish ./
       - name: publish_linux_x64
-        run: dotnet publish ./src/ISRORCert.sln -r linux-x64 -c Release --self-contained true -p:PublishReadyToRun=true && tar -czvf ISRORCert_linux-x64.tar.gz -C ./src/ISRORCert/bin/Release/net6.0/linux-x64/publish ./
+        run: dotnet publish ./src/ISRORCert/ISRORCert.csproj -r linux-x64 -c Release --self-contained true -p:PublishReadyToRun=true && tar -czvf ISRORCert_linux-x64.tar.gz -C ./src/ISRORCert/bin/Release/net10.0/linux-x64/publish ./
 
       - name: Create Release
         uses: ncipollo/release-action@v1

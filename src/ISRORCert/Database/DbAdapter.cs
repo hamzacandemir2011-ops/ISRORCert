@@ -14,7 +14,7 @@ namespace ISRORCert.Database
 
         private readonly ILogger _logger;
 
-        public string ConnectionString { get; set; } = string.Empty;
+        public virtual string ConnectionString { get; set; } = string.Empty;
 
         private readonly DbProviderFactory _factory;
 
@@ -119,6 +119,23 @@ namespace ISRORCert.Database
             {
                 _logger.LogError(ex, "DbAdapter error");
                 return -1;
+            }
+        }
+
+        public bool TryExecute(string cmdText, params DbParameter[] parameters)
+        {
+            try
+            {
+                using (var connection = GetConnection())
+                using (var command = GetCommand(connection, cmdText, parameters))
+                    command.ExecuteNonQuery();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DbAdapter error");
+                return false;
             }
         }
 

@@ -30,8 +30,12 @@ var builder = new HostBuilder()
 
        services.AddSingleton<IDbAdapter, SqlDbAdapter>();
 
-       services.AddSingleton<ICertificationSerializer, CertificationSerializerOld>(); // VSRO188
-       services.AddSingleton<ICertificationSerializer, CertificationSerializerNew>(); // ISROR2015+
+       // Registering both made DI always resolve the last one, so the serializer is picked from the config instead.
+       var version = hostContext.Configuration.GetValue<string>("CertificationConfig:Version") ?? "ISROR";
+       if (string.Equals(version, "VSRO188", StringComparison.OrdinalIgnoreCase))
+           services.AddSingleton<ICertificationSerializer, CertificationSerializerOld>(); // VSRO188
+       else
+           services.AddSingleton<ICertificationSerializer, CertificationSerializerNew>(); // ISROR2015+
 
        services.AddSingleton<AsyncServer>();
        services.AddSingleton<IAsyncInterface, CertificationInterface>();

@@ -1,51 +1,45 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 
 using System;
-using System.Data.SqlClient;
 using System.Linq;
-using System.Text;
 
 namespace ISRORCert.Database
 {
     internal class SqlDbAdapter : DbAdapter
     {
-        public static string ToSqlConnectionString(string odbcConnectionString)
+        private string _connectionString = string.Empty;
+
+        /// <summary>
+        /// Microsoft.Data.SqlClient encrypts connections by default, which fails against the usual local SQL Server
+        /// without a trusted certificate. Unless the connection string says otherwise, keep the old
+        /// System.Data.SqlClient behavior (no encryption required).
+        /// </summary>
+        public override string ConnectionString
         {
-            var result = new StringBuilder(256);
-            foreach (var argument in odbcConnectionString.Split(';'))
-            {
-                var kvpArgument = argument.Split('=');
-                var key = kvpArgument[0].ToUpperInvariant();
-                var value = kvpArgument[1];
-                switch (key)
-                {
-                    case "SERVER":
-                        result.Append($"Data Source={value};");
-                        break;
+            get => _connectionString;
+            set => _connectionString = NormalizeConnectionString(value);
+        }
 
-                    case "UID":
-                        result.Append($"User ID={value};");
-                        break;
+        public static string NormalizeConnectionString(string connectionString)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString))
+                return connectionString;
 
-                    case "PWD":
-                        result.Append($"Password={value};");
-                        break;
+            var builder = new SqlConnectionStringBuilder(connectionString);
+            if (!connectionString.Contains("Encrypt", StringComparison.OrdinalIgnoreCase))
+                builder.Encrypt = SqlConnectionEncryptOption.Optional;
 
-                    case "DATABASE":
-                        result.Append($"Initial Catalog={value};");
-                        break;
-                }
-            }
-            //result.Append("MultipleActiveResultSets=True");
-            return result.ToString();
+            return builder.ConnectionString;
         }
 
         public SqlDbAdapter(ILogger<SqlDbAdapter> logger) : base(logger, SqlClientFactory.Instance)
         {
         }
 
-        public SqlDbAdapter(ILogger<SqlDbAdapter> logger, string connectionString) : base(logger, SqlClientFactory.Instance, connectionString)
+        public SqlDbAdapter(ILogger<SqlDbAdapter> logger, string connectionString) : base(logger, SqlClientFactory.Instance)
         {
+            ConnectionString = connectionString;
         }
     }
 }

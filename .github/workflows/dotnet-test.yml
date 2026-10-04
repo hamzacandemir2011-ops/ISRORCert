@@ -1,0 +1,24 @@
+# Builds and tests pull requests (the tag/release workflow only runs on master).
+name: .NET build and test
+
+on:
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore dependencies
+        run: dotnet restore ./src/ISRORCert.sln
+      - name: Build
+        run: dotnet build ./src/ISRORCert.sln --configuration Release --no-restore
+      - name: Test
+        run: dotnet test ./src/ISRORCert.sln --configuration Release --no-build --verbosity normal
