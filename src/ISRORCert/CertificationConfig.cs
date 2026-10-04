@@ -16,5 +16,10 @@ namespace ISRORCert
         /// How often (seconds) a status summary is logged: connected modules and server body/cord states. 0 disables it.
         /// </summary>
         public int StatusIntervalSeconds { get; set; } = 300;
+
+        /// <summary>
+        /// Read commands (help, status, sessions, reload, kick) from the console while running.
+        /// </summary>
+        public bool ConsoleCommands { get; set; } = true;
     }
 }

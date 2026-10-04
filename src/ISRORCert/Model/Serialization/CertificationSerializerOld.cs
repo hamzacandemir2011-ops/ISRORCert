@@ -96,7 +96,7 @@ namespace ISRORCert.Model.Serialization
             packet.WriteInt(value.SessionId); // dwSessionID
         }
 
-        public void Serialize(Packet packet, CertificationManager certificationMgr, ServerBody certifiedBody)
+        public void Serialize(Packet packet, CertificationData certificationMgr, ServerBody certifiedBody)
         {
             // Module
             packet.WriteByte(0);

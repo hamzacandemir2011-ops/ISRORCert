@@ -115,7 +115,7 @@ namespace ISRORCert.Model.Serialization
             }
         }
 
-        public void Serialize(Packet packet, CertificationManager certificationMgr, ServerBody certifiedBody)
+        public void Serialize(Packet packet, CertificationData certificationMgr, ServerBody certifiedBody)
         {
             // ServerBodies 
             packet.WriteByte(0);

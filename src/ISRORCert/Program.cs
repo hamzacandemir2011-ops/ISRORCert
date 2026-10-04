@@ -43,6 +43,7 @@ var builder = new HostBuilder()
        services.AddSingleton<IAsyncInterface, CertificationInterface>();
        services.AddSingleton<CertificationManager>();
        services.AddSingleton<SessionRegistry>();
+       services.AddSingleton<ConsoleCommands>();
        services.AddSingleton(TimeProvider.System);
 
        services.AddSingleton<PacketHandlerManager>();
@@ -55,6 +56,7 @@ var builder = new HostBuilder()
        services.AddHostedService<CertificationService>();
        services.AddHostedService<AsyncServerTickService>();
        services.AddHostedService<StatusReportService>();
+       services.AddHostedService<ConsoleCommandService>();
    })
    .ConfigureLogging((hostingContext, logging) =>
    {
