@@ -19,7 +19,8 @@ When it starts, it loads the server topology (divisions, farms, shards, machines
   {
     "DbConfig": "Data Source=10.0.0.2;Initial Catalog=SILKROAD_CERTIFICATION;User ID=sa;Password=1", // 👈 Your certification DB
     "Version": "ISROR", // 👈 "ISROR" (ISROR 2015+, default) or "VSRO188"
-    "StatusIntervalSeconds": 300 // 👈 How often a status summary is logged (0 = off)
+    "StatusIntervalSeconds": 300, // 👈 How often a status summary is logged (0 = off)
+    "ConsoleCommands": true       // 👈 Accept commands typed in the console, see below
   },
   "Logging": {
     "File": {
@@ -53,9 +54,29 @@ Status: 2 connection(s), 6 server bodies, 3 cords
   cords by state: Stable=3
 ```
 
+## Console commands
+While the server is running you can type these commands in its console:
+
+| Command | What it does |
+|---|---|
+| `help` | Lists the commands |
+| `status` | Prints the status summary right away |
+| `sessions` | Lists the connected modules: session id, address, certified server body and its state |
+| `reload` | Reloads the topology from the database without restarting |
+| `kick <target>` | Disconnects connections by IP (`10.0.0.5`), server body ID (`6`) or session id prefix (from `sessions`, at least 4 characters) |
+
+If the server has no console input (e.g. running as a Windows service or in a container without stdin), the commands are simply not available. Set `ConsoleCommands` to `false` to turn them off.
+
+### Reloading the topology
+After changing the `SILKROAD_CERTIFICATION` tables (adding a shard, a machine, a server body...), type `reload` instead of restarting:
+- The new data replaces the old one in one step, so a module that connects during the reload gets either the old or the new topology, never a mix.
+- Connected modules stay connected. The state they reported (e.g. `ServiceRunning`) is kept for every server body and cord that still exists.
+- If the new data can't be loaded or is invalid (database down, no Certification module/body, duplicate IDs), the current data is kept and the reason is logged.
+- Modules that were already certified keep the configuration they received at that time. Restart a module to give it the new topology.
+
 ## Known limitations
 - Relaying messages to a server body other than the Certification server itself (`0x6008` with another target) is not implemented yet. The connection that requests it gets dropped (and the reason is logged).
-- Topology changes in the database require a restart.
+- Changing the Certification server's own address or port needs a restart (the listener is already bound). `reload` logs a warning when it detects that.
 
 ## Development
 ```bash

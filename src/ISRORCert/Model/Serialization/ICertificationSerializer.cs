@@ -23,6 +23,6 @@ namespace ISRORCert.Model.Serialization
         public void Serialize(Packet packet, ServerBody value);
 
         public void Serialize(Packet packet, ServerCord value);
-        void Serialize(Packet certificateAck, CertificationManager certificationManager, ServerBody serverBody);
+        void Serialize(Packet certificateAck, CertificationData certificationData, ServerBody serverBody);
     }
 }

@@ -26,7 +26,9 @@ namespace ISRORCert.Logic.Handler
 
         private bool OnCertificateReq(AsyncContext context, Packet packet, int relayID)
         {
-            if (_certificationManager.Identity is null)
+            // One snapshot for the whole request, so a reload can't change the data halfway through the certificate.
+            var data = _certificationManager.Current;
+            if (data.Identity is null)
                 return false;
 
             var moduleName = packet.ReadString();
@@ -37,7 +39,7 @@ namespace ISRORCert.Logic.Handler
 
             _logger.LogInformation($"Certification request from {moduleAddress}:{modulePort} ({moduleName})");
 
-            if (!_certificationManager.TryGetCertifiableServerBody(moduleName, moduleAddress, modulePort, out var serverBody))
+            if (!data.TryGetCertifiableServerBody(moduleName, moduleAddress, modulePort, out var serverBody))
             {
                 _logger.LogError($"Cannot certify server body: {moduleAddress}:{modulePort} ({moduleName})");
                 return false;
@@ -63,7 +65,7 @@ namespace ISRORCert.Logic.Handler
             certificateAck.WriteBytes(buffer);
 #endif
 
-            _certificationSerializer.Serialize(certificateAck, _certificationManager, serverBody);
+            _certificationSerializer.Serialize(certificateAck, data, serverBody);
 
             certificateAck.WriteByte(0); // hasSecurityDesc
 

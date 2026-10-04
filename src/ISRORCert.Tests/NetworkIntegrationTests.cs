@@ -30,6 +30,7 @@ public class NetworkIntegrationTests
         services.AddSingleton<IAsyncInterface, CertificationInterface>();
         services.AddSingleton<CertificationManager>();
         services.AddSingleton<SessionRegistry>();
+        services.AddSingleton<ConsoleCommands>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<PacketHandlerManager>();
         services.AddSingleton<IPacketHandler, PacketHandlerSetupCord>();
@@ -137,5 +138,67 @@ public class NetworkIntegrationTests
         Assert.Equal(0, read);
         Assert.Equal(0, server.ConnectionCount);
         Assert.Empty(services.GetRequiredService<SessionRegistry>().Snapshot());
+    }
+
+    private static Packet CertificateRequest(ushort port)
+    {
+        var request = new Packet(0x6003);
+        request.WriteString("AgentServer");
+        request.WriteString("127.0.0.1");
+        request.WriteUShort(port);
+        return request;
+    }
+
+    [Fact]
+    public async Task ReloadAndKick_WhileConnected()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var adapter = CertificationData.CreateAdapter(privateIp: "127.0.0.1");
+        await using var services = BuildServices(adapter);
+        var manager = services.GetRequiredService<CertificationManager>();
+        Assert.True(await manager.RefreshAsync());
+        services.GetServices<IPacketHandler>().ToList();
+        var commands = services.GetRequiredService<ConsoleCommands>();
+        var registry = services.GetRequiredService<SessionRegistry>();
+
+        var server = services.GetRequiredService<AsyncServer>();
+        var port = FreePort();
+        server.Accept("127.0.0.1", port, 4, services.GetRequiredService<IAsyncInterface>());
+
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(IPAddress.Loopback, port, cts.Token);
+        var security = new Security();
+
+        // Like a real module: setup cord first. After it the server treats the connection as a trusted
+        // server module, which (in this SecurityApi) means count bytes are 0 from now on, on both sides.
+        var setupCord = new Packet(0x2001);
+        setupCord.WriteString("AgentServer");
+        setupCord.WriteByte(0);
+        security.Send(setupCord);
+        await ReceiveAsync(client, security, server, 0x2001, cts.Token);
+        security.SetTrusted();
+
+        security.Send(CertificateRequest(15884));
+        Assert.Equal(1, (await ReceiveAsync(client, security, server, 0xA003, cts.Token)).ReadByte());
+
+        // Add a new AgentServer body to the database and reload while the module stays connected.
+        adapter.Tables["_GetServerBodyList"].Rows.Add((short)7, DBNull.Value, DBNull.Value, (short)64, 1, (byte)6, (byte)0, (short)1, (short)15885);
+        Assert.Equal("Reloaded: 7 server bodies, 0 cords.", await commands.ExecuteAsync("reload", cts.Token));
+        Assert.Equal((short)6, Assert.Single(registry.Snapshot()).Body?.ID); // remapped to the new body object
+        Assert.True(manager.TryGetServerBody(6, out var reloadedAgent));
+        Assert.Same(reloadedAgent, registry.Snapshot()[0].Body);
+
+        // The same connection can now be certified as the new body.
+        security.Send(CertificateRequest(15885));
+        Assert.Equal(1, (await ReceiveAsync(client, security, server, 0xA003, cts.Token)).ReadByte());
+        Assert.Equal((short)7, Assert.Single(registry.Snapshot()).Body?.ID);
+
+        // Kick it by IP: the server closes the connection.
+        Assert.Equal("Disconnected 1 connection(s).", await commands.ExecuteAsync("kick 127.0.0.1", cts.Token));
+        var buffer = new byte[8192];
+        while (await client.ReceiveAsync(buffer, SocketFlags.None, cts.Token) > 0) { }
+        for (var i = 0; i < 200 && registry.Snapshot().Count > 0; i++)
+            await Task.Delay(10, cts.Token);
+        Assert.Empty(registry.Snapshot());
     }
 }
