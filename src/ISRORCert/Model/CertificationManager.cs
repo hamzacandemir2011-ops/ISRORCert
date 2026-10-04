@@ -61,22 +61,43 @@ namespace ISRORCert.Model
         {
             _logger.LogInformation("Querying certification data...");
 
+            // Load into fresh lists so a refresh never duplicates entries and a failed refresh keeps the previous data.
+            var contentList = new List<Content>();
+            var moduleList = new List<Module>();
+            var divisionList = new List<Division>();
+            var farmList = new List<Farm>();
+            var farmContentList = new List<FarmContent>();
+            var shardList = new List<Shard>();
+            var serverMachineList = new List<ServerMachine>();
+            var serverBodyList = new List<ServerBody>();
+            var serverCordList = new List<ServerCord>();
+
             var results = await Task.WhenAll(
-                _adapter.GetDataTableAsync(_contentList, "_GetContentList", cancellationToken),
-                _adapter.GetDataTableAsync(_moduleList, "_GetModuleList", cancellationToken),
-                _adapter.GetDataTableAsync(_divisionList, "_GetDivisionList", cancellationToken),
-                _adapter.GetDataTableAsync(_farmList, "_GetFarmList", cancellationToken),
-                _adapter.GetDataTableAsync(_farmContentList, "_GetFarmContentList", cancellationToken),
-                _adapter.GetDataTableAsync(_shardList, "_GetShardList", cancellationToken),
-                _adapter.GetDataTableAsync(_serverMachineList, "_GetServerMachineList", cancellationToken),
-                _adapter.GetDataTableAsync(_serverBodyList, "_GetServerBodyList", cancellationToken),
-                _adapter.GetDataTableAsync(_serverCordList, "_GetServerCordList", cancellationToken));
+                _adapter.GetDataTableAsync(contentList, "_GetContentList", cancellationToken),
+                _adapter.GetDataTableAsync(moduleList, "_GetModuleList", cancellationToken),
+                _adapter.GetDataTableAsync(divisionList, "_GetDivisionList", cancellationToken),
+                _adapter.GetDataTableAsync(farmList, "_GetFarmList", cancellationToken),
+                _adapter.GetDataTableAsync(farmContentList, "_GetFarmContentList", cancellationToken),
+                _adapter.GetDataTableAsync(shardList, "_GetShardList", cancellationToken),
+                _adapter.GetDataTableAsync(serverMachineList, "_GetServerMachineList", cancellationToken),
+                _adapter.GetDataTableAsync(serverBodyList, "_GetServerBodyList", cancellationToken),
+                _adapter.GetDataTableAsync(serverCordList, "_GetServerCordList", cancellationToken));
 
             if(results.Any(p => p == false))
             {
                 _logger.LogCritical("Failed to query certification data...");
                 return false;
             }
+
+            _contentList = contentList;
+            _moduleList = moduleList;
+            _divisionList = divisionList;
+            _farmList = farmList;
+            _farmContentList = farmContentList;
+            _shardList = shardList;
+            _serverMachineList = serverMachineList;
+            _serverBodyList = serverBodyList;
+            _serverCordList = serverCordList;
 
             _contentByID = _contentList.ToDictionary(p => p.Id);
             _moduleByID = _moduleList.ToDictionary(p => p.Id);
@@ -257,17 +278,40 @@ namespace ISRORCert.Model
 
             foreach (var item in _serverBodyList)
             {
+                if (item.Module is null)
+                    continue;
+
                 if (item.Module == globalModule)
-                    item.Division!.ManagerBodyID = item.ID;
+                {
+                    if (item.Division is null)
+                        _logger.LogError($"GlobalManager {nameof(ServerBody)}#{item.ID} has no {nameof(Division)}");
+                    else
+                        item.Division.ManagerBodyID = item.ID;
+                }
 
                 if (item.Module == machineModule)
-                    item.Machine!.ManagerBodyID = item.ID;
+                {
+                    if (item.Machine is null)
+                        _logger.LogError($"MachineManager {nameof(ServerBody)}#{item.ID} has no {nameof(ServerMachine)}");
+                    else
+                        item.Machine.ManagerBodyID = item.ID;
+                }
 
                 if (item.Module == farmModule)
-                    item.Farm!.ManagerBodyID = item.ID;
+                {
+                    if (item.Farm is null)
+                        _logger.LogError($"FarmManager {nameof(ServerBody)}#{item.ID} has no {nameof(Farm)}");
+                    else
+                        item.Farm.ManagerBodyID = item.ID;
+                }
 
                 if (item.Module == shardModule)
-                    item.Shard!.ManageBodyID = item.ID;
+                {
+                    if (item.Shard is null)
+                        _logger.LogError($"ShardManager {nameof(ServerBody)}#{item.ID} has no {nameof(Shard)}");
+                    else
+                        item.Shard.ManageBodyID = item.ID;
+                }
             }
         }
         public bool TryGetCertifiableServerBody(string moduleName, string moduleAddress, ushort modulePort, [MaybeNullWhen(false)] out ServerBody serverBody)
@@ -291,7 +335,10 @@ namespace ISRORCert.Model
                 if (item.ModuleID != module.Id)
                     continue; // wrong module
 
-                var machine = _serverMachineByID[item.MachineID];
+                var machine = item.Machine;
+                if (machine is null)
+                    continue; // unknown machine, already reported while linking
+
                 if (moduleAddress != machine.PublicIP && moduleAddress != machine.PrivateIP)
                     continue;
 
@@ -315,11 +362,13 @@ namespace ISRORCert.Model
                 return false;
 
             // TODO: Async
-            _adapter.Execute("_UpdateShardName",
+            if (!_adapter.TryExecute("_UpdateShardName",
                 _adapter.GetInputParameter("@nID", shard.ID),
-                _adapter.GetInputParameter("@szName", newName));
-
-            // TODO: Check result
+                _adapter.GetInputParameter("@szName", newName)))
+            {
+                _logger.LogError($"Failed to save {nameof(Shard)}#{shard} name: {shard.Name} -> {newName}");
+                return false;
+            }
 
             _logger.LogInformation($"Changed {nameof(Shard)}#{shard} name: {shard.Name} -> {newName}");
             shard.Name = newName;
@@ -331,11 +380,13 @@ namespace ISRORCert.Model
                 return false;
 
             // TODO: Async
-            _adapter.Execute("_UpdateShardMaxUser",
+            if (!_adapter.TryExecute("_UpdateShardMaxUser",
                 _adapter.GetInputParameter("@nID", shard.ID),
-                _adapter.GetInputParameter("@nMaxUser", newMaxUser));
-
-            // TODO: Check result
+                _adapter.GetInputParameter("@nMaxUser", newMaxUser)))
+            {
+                _logger.LogError($"Failed to save {nameof(Shard)}#{shard} max user: {shard.MaxUser} -> {newMaxUser}");
+                return false;
+            }
 
             _logger.LogInformation($"Changed {nameof(Shard)}#{shard} max user: {shard.MaxUser} -> {newMaxUser}");
             shard.MaxUser = newMaxUser;

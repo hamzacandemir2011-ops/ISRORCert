@@ -43,6 +43,8 @@ namespace ISRORCert.Logic.Handler
             var certificateAck = new Packet(0xA003, false, true);
             certificateAck.WriteByte(1); // result
 
+            // Placeholder block written where the original certification server sends its own data:
+            // 3 dummy 4-byte payloads (0xDEADC0DE) followed by an empty 128-byte buffer.
 #if true
             certificateAck.WriteByte(3);
             for (int i = 0; i < 3; i++)
