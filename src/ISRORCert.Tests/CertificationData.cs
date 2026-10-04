@@ -19,7 +19,7 @@ internal static class CertificationData
         return table;
     }
 
-    public static FakeDbAdapter CreateAdapter(bool includeGlobalManagerModule = true, int agentMachineId = 1)
+    public static FakeDbAdapter CreateAdapter(bool includeGlobalManagerModule = true, int agentMachineId = 1, string privateIp = PrivateIp)
     {
         var adapter = new FakeDbAdapter();
 
@@ -55,7 +55,7 @@ internal static class CertificationData
         adapter.Tables["_GetShardList"] = shards;
 
         var machines = Table(("id", typeof(int)), ("division", typeof(byte)), ("name", typeof(string)), ("public", typeof(string)), ("private", typeof(string)));
-        machines.Rows.Add(1, (byte)1, "Machine", PublicIp, PrivateIp);
+        machines.Rows.Add(1, (byte)1, "Machine", PublicIp, privateIp);
         adapter.Tables["_GetServerMachineList"] = machines;
 
         var bodies = Table(("id", typeof(short)), ("division", typeof(byte)), ("farm", typeof(byte)), ("shard", typeof(short)),

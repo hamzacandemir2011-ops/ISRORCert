@@ -14,9 +14,14 @@ namespace ISRORCert.Logic
         private readonly PacketHandlerManager _packetHandlerManager;
         private readonly IEnumerable<IPacketHandler> _packetHandlers;
         private readonly CertificationManager _certificationManager;
+        private readonly SessionRegistry _sessionRegistry;
+        private readonly TimeProvider _timeProvider;
 
-        public CertificationInterface(ILogger<CertificationInterface> logger, PacketHandlerManager packetHandlerManager, IEnumerable<IPacketHandler> packetHandlers, CertificationManager certificationManager)
+        public CertificationInterface(ILogger<CertificationInterface> logger, PacketHandlerManager packetHandlerManager, IEnumerable<IPacketHandler> packetHandlers, CertificationManager certificationManager,
+            SessionRegistry sessionRegistry, TimeProvider timeProvider)
         {
+            _sessionRegistry = sessionRegistry;
+            _timeProvider = timeProvider;
             _logger = logger;
             _packetHandlerManager = packetHandlerManager;
             _packetHandlers = packetHandlers;
@@ -36,7 +41,8 @@ namespace ISRORCert.Logic
             }
 
             context.Connected = true;
-            _logger.LogInformation("Connected: {guid}", context.Guid);
+            _sessionRegistry.Add(context, ipEndPoint, _timeProvider.GetUtcNow());
+            _logger.LogInformation("Connected: {guid} from {endPoint}", context.Guid, ipEndPoint);
             return true;
         }
 
@@ -75,6 +81,7 @@ namespace ISRORCert.Logic
         public void OnDisconnect(AsyncContext context)
         {
             context.Connected = false;
+            _sessionRegistry.Remove(context);
             _logger.LogInformation($"Disconnected: {context.Guid}");
         }
 
@@ -85,6 +92,7 @@ namespace ISRORCert.Logic
 
             _logger.LogInformation($"Disconnected (error): {context.Guid}");
             context.Connected = false;
+            _sessionRegistry.Remove(context);
         }
 
         public void OnTick(AsyncContext context)

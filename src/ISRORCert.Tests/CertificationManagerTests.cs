@@ -99,8 +99,8 @@ public class CertificationManagerTests
         await manager.RefreshAsync();
         Assert.True(manager.TryGetShard(64, out var shard));
 
-        Assert.True(manager.UpdateShardName(shard, "NewName"));
-        Assert.True(manager.UpdateShardMaxUser(shard, 2000));
+        Assert.True(await manager.UpdateShardNameAsync(shard, "NewName"));
+        Assert.True(await manager.UpdateShardMaxUserAsync(shard, 2000));
         Assert.Equal("NewName", shard.Name);
         Assert.Equal(2000, shard.MaxUser);
         Assert.Equal(new[] { "_UpdateShardName", "_UpdateShardMaxUser" }, adapter.ExecutedProcedures);
@@ -117,9 +117,38 @@ public class CertificationManagerTests
         adapter.FailingProcedures.Add("_UpdateShardName");
         adapter.FailingProcedures.Add("_UpdateShardMaxUser");
 
-        Assert.False(manager.UpdateShardName(shard, "NewName"));
-        Assert.False(manager.UpdateShardMaxUser(shard, 2000));
+        Assert.False(await manager.UpdateShardNameAsync(shard, "NewName"));
+        Assert.False(await manager.UpdateShardMaxUserAsync(shard, 2000));
         Assert.Equal("Shard", shard.Name);
         Assert.Equal(1000, shard.MaxUser);
+    }
+
+    [Fact]
+    public async Task UpdateShard_SameValue_IsRejectedWithoutDbCall()
+    {
+        var adapter = CertificationData.CreateAdapter();
+        var manager = CreateManager(adapter);
+        await manager.RefreshAsync();
+        Assert.True(manager.TryGetShard(64, out var shard));
+
+        Assert.False(await manager.UpdateShardNameAsync(shard, "Shard"));
+        Assert.False(await manager.UpdateShardMaxUserAsync(shard, 1000));
+        Assert.Empty(adapter.ExecutedProcedures);
+    }
+
+    [Fact]
+    public async Task UpdateShard_ConcurrentSameValue_OnlyOneWins()
+    {
+        var adapter = CertificationData.CreateAdapter();
+        var manager = CreateManager(adapter);
+        await manager.RefreshAsync();
+        Assert.True(manager.TryGetShard(64, out var shard));
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 20)
+            .Select(_ => Task.Run(() => manager.UpdateShardNameAsync(shard, "NewName"))));
+
+        Assert.Single(results, true);
+        Assert.Single(adapter.ExecutedProcedures);
+        Assert.Equal("NewName", shard.Name);
     }
 }

@@ -139,6 +139,23 @@ namespace ISRORCert.Database
             }
         }
 
+        public async Task<bool> TryExecuteAsync(string cmdText, CancellationToken cancellationToken = default, params DbParameter[] parameters)
+        {
+            try
+            {
+                using (var connection = await GetConnectionAsync(cancellationToken).ConfigureAwait(false))
+                using (var command = GetCommand(connection, cmdText, parameters))
+                    await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DbAdapter error");
+                return false;
+            }
+        }
+
         public T? GetScalar<T>(string cmdText, params DbParameter[] parameters) where T : unmanaged
         {
             try

@@ -18,7 +18,15 @@ When it starts, it loads the server topology (divisions, farms, shards, machines
   "CertificationConfig":
   {
     "DbConfig": "Data Source=10.0.0.2;Initial Catalog=SILKROAD_CERTIFICATION;User ID=sa;Password=1", // 👈 Your certification DB
-    "Version": "ISROR" // 👈 "ISROR" (ISROR 2015+, default) or "VSRO188"
+    "Version": "ISROR", // 👈 "ISROR" (ISROR 2015+, default) or "VSRO188"
+    "StatusIntervalSeconds": 300 // 👈 How often a status summary is logged (0 = off)
+  },
+  "Logging": {
+    "File": {
+      "Path": "CertLog.txt",           // 👈 Logs are written here as well as to the console (remove "File" to disable)
+      "FileSizeLimitBytes": 10485760,  // 👈 10 MB per file...
+      "MaxRollingFiles": 5             // 👈 ...keeping the last 5 files
+    }
   }
 }
 ```
@@ -31,6 +39,19 @@ Any value can also be overridden with an environment variable (`CertificationCon
 - The listening address and port come from the database: the `_ServerBody` whose module is `Certification`, on its machine's public IP and `ListenerPort`.
 - Only connections from IPs registered in the `_ServerMachine` table (public or private IP) are accepted.
 - If the database can't be loaded or the listener can't be started, the server logs the reason and exits with code `1` (instead of running without listening).
+- Shard name / max user changes coming from the GlobalManager are saved to the database in the background, so a slow database doesn't block the connection. The change is only applied (and acknowledged) if the database update succeeded.
+
+## Status summary
+Every `StatusIntervalSeconds` the server logs which modules are connected and the state of every server body, e.g.:
+
+```
+Status: 2 connection(s), 6 server bodies, 3 cords
+  connection 10.0.0.5:51234 (ServerBody#6 - AgentServer), connected 2h 5m ago
+  connection 10.0.0.6:51240 (not certified yet), connected 0m 30s ago
+  bodies by state: Blind=1, Loading=1, ServiceRunning=4
+  not running: ServerBody#6 - AgentServer is 'Loading'
+  cords by state: Stable=3
+```
 
 ## Known limitations
 - Relaying messages to a server body other than the Certification server itself (`0x6008` with another target) is not implemented yet. The connection that requests it gets dropped (and the reason is logged).

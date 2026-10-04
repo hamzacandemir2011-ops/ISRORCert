@@ -12,9 +12,12 @@ namespace ISRORCert.Logic.Handler
         private ICertificationSerializer _certificationSerializer;
         private CertificationManager _certificationManager;
         private ILogger _logger;
+        private readonly SessionRegistry _sessionRegistry;
 
-        public PacketHandlerCertificate(ILogger<PacketHandlerCertificate> logger, PacketHandlerManager packetHandlerManager, CertificationManager certificationManager, ICertificationSerializer certificationSerializer)
+        public PacketHandlerCertificate(ILogger<PacketHandlerCertificate> logger, PacketHandlerManager packetHandlerManager, CertificationManager certificationManager, ICertificationSerializer certificationSerializer,
+            SessionRegistry sessionRegistry)
         {
+            _sessionRegistry = sessionRegistry;
             _logger = logger;
             _certificationManager = certificationManager;
             packetHandlerManager[0x6003] = OnCertificateReq;
@@ -39,6 +42,8 @@ namespace ISRORCert.Logic.Handler
                 _logger.LogError($"Cannot certify server body: {moduleAddress}:{modulePort} ({moduleName})");
                 return false;
             }
+
+            _sessionRegistry.SetCertifiedBody(context, serverBody);
 
             var certificateAck = new Packet(0xA003, false, true);
             certificateAck.WriteByte(1); // result
