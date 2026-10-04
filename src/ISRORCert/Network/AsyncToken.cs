@@ -1,10 +1,10 @@
-﻿using System.Net.Sockets;
+using System.Net.Sockets;
 
 namespace ISRORCert.Network
 {
     public class AsyncToken
     {
-        public Socket Socket { get; set; }
-        public IAsyncInterface Interface { get; set; }
+        public required Socket Socket { get; init; }
+        public required IAsyncInterface Interface { get; init; }
     }
 }

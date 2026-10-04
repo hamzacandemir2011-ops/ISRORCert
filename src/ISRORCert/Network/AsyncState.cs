@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+
+using System;
 using System.Net;
 using System.Net.Sockets;
 
@@ -50,6 +52,8 @@ namespace ISRORCert.Network
             };
         }
 
+        // Shutdown/Close throw when the socket is already closed or reset; that's expected here and safe to ignore.
+
         internal void Disconnect()
         {
             try
@@ -91,11 +95,11 @@ namespace ISRORCert.Network
             }
         }
 
+        private ILogger Logger => m_server.Logger;
+
         private void ProcessSend(SocketAsyncEventArgs e)
         {
-            AsyncState state = e.UserToken as AsyncState;
-
-            if (state.ProcessWrite(e))
+            if (ProcessWrite(e))
             {
                 return;
             }
@@ -105,14 +109,24 @@ namespace ISRORCert.Network
 
         private void ProcessRecv(SocketAsyncEventArgs e)
         {
-            AsyncState state = e.UserToken as AsyncState;
-
-            if (state.ProcessRead(e))
+            if (ProcessRead(e))
             {
                 return;
             }
 
             m_server.RemoveState(this);
+        }
+
+        private void NotifyDisconnect()
+        {
+            try
+            {
+                Context.Interface.OnDisconnect(Context);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "OnDisconnect failed for {Guid}", Context.Guid);
+            }
         }
 
         internal void Read()
@@ -129,11 +143,7 @@ namespace ISRORCert.Network
             {
                 if (e.BytesTransferred <= 0 || e.SocketError != SocketError.Success)
                 {
-                    try
-                    {
-                        Context.Interface.OnDisconnect(Context);
-                    }
-                    catch (Exception) { }
+                    NotifyDisconnect();
                     Cleanup();
                     return false;
                 }
@@ -143,23 +153,23 @@ namespace ISRORCert.Network
                 {
                     result = Context.Interface.OnReceive(Context, m_read_buffer, e.BytesTransferred);
                 }
-                catch (Exception) { }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "OnReceive failed for {Guid}", Context.Guid);
+                }
 
                 if (!result)
                 {
-                    try
-                    {
-                        Context.Interface.OnDisconnect(Context);
-                    }
-                    catch (Exception) { }
+                    NotifyDisconnect();
                     Cleanup();
                     return false;
                 }
 
                 Read();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Logger.LogWarning(ex, "Read failed for {Guid}", Context.Guid);
                 Cleanup();
                 return false;
             }
@@ -198,17 +208,16 @@ namespace ISRORCert.Network
             {
                 if (e.BytesTransferred <= 0 || e.SocketError != SocketError.Success) // Check for errors
                 {
-                    try
-                    {
-                        Context.Interface.OnDisconnect(Context);
-                    }
-                    catch (Exception) { }
+                    NotifyDisconnect();
                     Cleanup();
                     return false;
                 }
 
                 lock (m_write_buffers)
                 {
+                    if (m_current_write_buffer == null)
+                        return true; // nothing in flight
+
                     m_current_write_buffer.Offset += e.BytesTransferred; // Update index
                     m_current_write_buffer.Count -= e.BytesTransferred; // Update count
 
@@ -223,8 +232,9 @@ namespace ISRORCert.Network
                     CheckWrite(); // Perform the logic to check for the next write
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Logger.LogWarning(ex, "Write failed for {Guid}", Context.Guid);
                 Cleanup();
                 return false;
             }

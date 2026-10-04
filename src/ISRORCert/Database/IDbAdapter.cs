@@ -13,6 +13,10 @@ namespace ISRORCert.Database
         /// (Execute's -1 is ambiguous: procedures using SET NOCOUNT ON also return -1 on success.)
         /// </summary>
         bool TryExecute(string cmdText, params DbParameter[] parameters);
+        /// <summary>
+        /// Async version of <see cref="TryExecute"/>.
+        /// </summary>
+        Task<bool> TryExecuteAsync(string cmdText, CancellationToken cancellationToken = default, params DbParameter[] parameters);
         Task<int> ExecuteAsync(string cmdText, CancellationToken cancellationToken = default, params DbParameter[] parameters);
         T? GetData<T>(string cmdText, params DbParameter[] parameters) where T : class, IDbEntity, new();
         Task<T?> GetDataAsync<T>(string cmdText, CancellationToken cancellationToken = default, params DbParameter[] parameters) where T : class, IDbEntity, new();

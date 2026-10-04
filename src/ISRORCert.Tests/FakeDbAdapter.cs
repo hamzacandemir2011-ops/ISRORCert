@@ -22,6 +22,12 @@ internal class FakeDbAdapter : IDbAdapter
         return !FailingProcedures.Contains(cmdText);
     }
 
+    public Task<bool> TryExecuteAsync(string cmdText, CancellationToken cancellationToken = default, params DbParameter[] parameters)
+    {
+        lock (ExecutedProcedures)
+            return Task.FromResult(TryExecute(cmdText, parameters));
+    }
+
     public int Execute(string cmdText, params DbParameter[] parameters) => TryExecute(cmdText, parameters) ? 0 : -1;
 
     public async Task<bool> GetDataTableAsync<T>(ICollection<T> collection, string cmdText, CancellationToken cancellationToken = default, params DbParameter[] parameters)

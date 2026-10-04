@@ -356,41 +356,59 @@ namespace ISRORCert.Model
         public bool TryGetServerCord(int id, [MaybeNullWhen(false)] out ServerCord serverCord) => _serverCordyByID.TryGetValue(id, out serverCord);
         public bool TryGetShard(short id, [MaybeNullWhen(false)] out Shard shard) => _shardByID.TryGetValue(id, out shard);
 
-        public bool UpdateShardName(Shard shard, string newName)
+        // Serializes shard updates, so two concurrent requests can't interleave the DB write and the in-memory change.
+        private readonly SemaphoreSlim _shardUpdateLock = new(1, 1);
+
+        public async Task<bool> UpdateShardNameAsync(Shard shard, string newName, CancellationToken cancellationToken = default)
         {
-            if (shard.Name == newName)
-                return false;
-
-            // TODO: Async
-            if (!_adapter.TryExecute("_UpdateShardName",
-                _adapter.GetInputParameter("@nID", shard.ID),
-                _adapter.GetInputParameter("@szName", newName)))
+            await _shardUpdateLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                _logger.LogError($"Failed to save {nameof(Shard)}#{shard} name: {shard.Name} -> {newName}");
-                return false;
-            }
+                if (shard.Name == newName)
+                    return false;
 
-            _logger.LogInformation($"Changed {nameof(Shard)}#{shard} name: {shard.Name} -> {newName}");
-            shard.Name = newName;
-            return true;
+                if (!await _adapter.TryExecuteAsync("_UpdateShardName", cancellationToken,
+                        _adapter.GetInputParameter("@nID", shard.ID),
+                        _adapter.GetInputParameter("@szName", newName)).ConfigureAwait(false))
+                {
+                    _logger.LogError($"Failed to save {nameof(Shard)}#{shard} name: {shard.Name} -> {newName}");
+                    return false;
+                }
+
+                _logger.LogInformation($"Changed {nameof(Shard)}#{shard} name: {shard.Name} -> {newName}");
+                shard.Name = newName;
+                return true;
+            }
+            finally
+            {
+                _shardUpdateLock.Release();
+            }
         }
-        public bool UpdateShardMaxUser(Shard shard, short newMaxUser)
+
+        public async Task<bool> UpdateShardMaxUserAsync(Shard shard, short newMaxUser, CancellationToken cancellationToken = default)
         {
-            if (shard.MaxUser == newMaxUser)
-                return false;
-
-            // TODO: Async
-            if (!_adapter.TryExecute("_UpdateShardMaxUser",
-                _adapter.GetInputParameter("@nID", shard.ID),
-                _adapter.GetInputParameter("@nMaxUser", newMaxUser)))
+            await _shardUpdateLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                _logger.LogError($"Failed to save {nameof(Shard)}#{shard} max user: {shard.MaxUser} -> {newMaxUser}");
-                return false;
-            }
+                if (shard.MaxUser == newMaxUser)
+                    return false;
 
-            _logger.LogInformation($"Changed {nameof(Shard)}#{shard} max user: {shard.MaxUser} -> {newMaxUser}");
-            shard.MaxUser = newMaxUser;
-            return true;
+                if (!await _adapter.TryExecuteAsync("_UpdateShardMaxUser", cancellationToken,
+                        _adapter.GetInputParameter("@nID", shard.ID),
+                        _adapter.GetInputParameter("@nMaxUser", newMaxUser)).ConfigureAwait(false))
+                {
+                    _logger.LogError($"Failed to save {nameof(Shard)}#{shard} max user: {shard.MaxUser} -> {newMaxUser}");
+                    return false;
+                }
+
+                _logger.LogInformation($"Changed {nameof(Shard)}#{shard} max user: {shard.MaxUser} -> {newMaxUser}");
+                shard.MaxUser = newMaxUser;
+                return true;
+            }
+            finally
+            {
+                _shardUpdateLock.Release();
+            }
         }
 
     }

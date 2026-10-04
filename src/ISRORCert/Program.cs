@@ -12,6 +12,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using NReco.Logging.File;
+
 var builder = new HostBuilder()
    .ConfigureAppConfiguration((hostingContext, config) =>
    {
@@ -40,6 +42,8 @@ var builder = new HostBuilder()
        services.AddSingleton<AsyncServer>();
        services.AddSingleton<IAsyncInterface, CertificationInterface>();
        services.AddSingleton<CertificationManager>();
+       services.AddSingleton<SessionRegistry>();
+       services.AddSingleton(TimeProvider.System);
 
        services.AddSingleton<PacketHandlerManager>();
        services.AddSingleton<IPacketHandler, PacketHandlerSetupCord>();
@@ -50,11 +54,14 @@ var builder = new HostBuilder()
 
        services.AddHostedService<CertificationService>();
        services.AddHostedService<AsyncServerTickService>();
+       services.AddHostedService<StatusReportService>();
    })
    .ConfigureLogging((hostingContext, logging) =>
    {
        logging.AddConfiguration(hostingContext.Configuration.GetSection("Logging"));
        logging.AddConsole();
+       if (hostingContext.Configuration.GetSection("Logging:File").Exists())
+           logging.AddFile(hostingContext.Configuration.GetSection("Logging"));
    });
 
 await builder.RunConsoleAsync();

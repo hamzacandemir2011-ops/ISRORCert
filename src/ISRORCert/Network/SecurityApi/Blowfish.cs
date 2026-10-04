@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Ported from SilkroadSecurityApi, which predates nullable reference types.
+#nullable disable
+
+using System;
 using System.Linq;
 
 namespace ISRORCert.Network.SecurityApi

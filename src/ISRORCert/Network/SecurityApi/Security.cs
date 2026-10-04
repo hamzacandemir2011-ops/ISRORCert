@@ -1,4 +1,7 @@
-﻿using System.Runtime.InteropServices;
+﻿// Ported from SilkroadSecurityApi, which predates nullable reference types.
+#nullable disable
+
+using System.Runtime.InteropServices;
 
 namespace ISRORCert.Network.SecurityApi
 {
